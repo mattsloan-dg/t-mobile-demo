@@ -1,0 +1,9 @@
+node_modules
+.next
+.git
+.firecrawl
+.env.local
+.env
+*.md
+.claude
+.playwright-mcp

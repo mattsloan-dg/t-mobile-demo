@@ -1,0 +1,23 @@
+app: t-mobile-demo
+
+build:
+  dockerfile: Dockerfile
+
+services:
+  - name: web
+    port: 3000
+    protocol: http
+    public: true
+    health_check:
+      path: /support
+      interval: 30
+      timeout: 5
+
+resources:
+  cpu: "250m"
+  memory: "512Mi"
+
+scaling:
+  min: 1
+  max: 2
+  target_cpu: 80

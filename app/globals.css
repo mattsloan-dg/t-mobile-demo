@@ -1,0 +1,77 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap");
+@import "tailwindcss";
+
+:root {
+  --background: #000000;
+  --foreground: #e8e9ea;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-tm-magenta: #E20074;
+  --color-tm-magenta-hover: #B8005D;
+  --color-tm-magenta-light: #FF4DA6;
+  --color-tm-dark: #1e1f23;
+  --color-tm-darker: #141518;
+  --color-tm-card: #1e2124;
+  --color-tm-border: #2f3336;
+  --color-tm-text: #e8e9ea;
+  --color-tm-text-secondary: #9da0a4;
+  --font-sans: "Inter", sans-serif;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: "Inter", sans-serif;
+}
+
+/* Custom scrollbar for dark theme */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #000;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #2F3336;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #3F4346;
+}
+
+/* Firefox scrollbar */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #2f3336 #000;
+}
+
+@keyframes highlightGlow {
+  0% {
+    box-shadow: 0 0 0 0 rgba(226, 0, 116, 0);
+  }
+  20% {
+    box-shadow: 0 0 0 4px rgba(226, 0, 116, 0.42);
+  }
+  80% {
+    box-shadow: 0 0 0 4px rgba(226, 0, 116, 0.42);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(226, 0, 116, 0);
+  }
+}
+
+.highlight-glow {
+  animation: highlightGlow 3s ease;
+  border-radius: 6px;
+}
