@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useMemo, useRef, useState } from "react";
 import { Search } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 export interface SearchArticle {
   slug: string;
@@ -39,9 +40,10 @@ export function filterArticleMatches(
 
 interface SearchBarProps {
   articles: SearchArticle[];
+  variant?: "default" | "hero";
 }
 
-export default function SearchBar({ articles }: SearchBarProps) {
+export default function SearchBar({ articles, variant = "default" }: SearchBarProps) {
   const [query, setQuery] = useState("");
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -50,29 +52,49 @@ export default function SearchBar({ articles }: SearchBarProps) {
     [articles, query]
   );
 
+  const isHero = variant === "hero";
+
   return (
-    <div ref={containerRef} className="relative w-full max-w-[500px]">
+    <div ref={containerRef} className={cn("relative w-full", isHero ? "max-w-[600px]" : "max-w-[500px]")}>
       <label htmlFor="support-search" className="sr-only">
         Search T-Mobile help articles
       </label>
-      <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-[#7d8794]" />
+      <Search
+        className={cn(
+          "pointer-events-none absolute left-4 top-1/2 -translate-y-1/2",
+          isHero ? "size-5 text-gray-400" : "size-4 text-[#7d8794]"
+        )}
+      />
       <input
         id="support-search"
         type="text"
         value={query}
         onChange={(event) => setQuery(event.target.value)}
         placeholder="Search help articles"
-        className="h-9 w-full rounded-full border border-[#e2e5e9] bg-[#eaedf1] pl-10 pr-4 text-[13px] text-[#1d2329] focus:outline-none focus-visible:ring-2 focus-visible:ring-tm-magenta focus-visible:border-transparent transition"
+        className={cn(
+          "w-full transition focus:outline-none",
+          isHero
+            ? "h-14 rounded-full bg-white pl-12 pr-6 text-[16px] text-gray-900 shadow-xl shadow-black/10 placeholder:text-gray-400 focus-visible:ring-2 focus-visible:ring-white/50"
+            : "h-9 rounded-full border border-[#e2e5e9] bg-[#eaedf1] pl-10 pr-4 text-[13px] text-[#1d2329] focus-visible:ring-2 focus-visible:ring-tm-magenta focus-visible:border-transparent"
+        )}
       />
 
       {results.length > 0 && (
-        <div className="absolute z-20 mt-2 w-full overflow-hidden rounded-xl border border-[#d9dde3] bg-white shadow-[0_12px_30px_rgba(15,23,42,0.08)]">
+        <div className={cn(
+          "absolute z-20 mt-2 w-full overflow-hidden rounded-xl border bg-white shadow-lg",
+          isHero ? "border-gray-200 shadow-black/10" : "border-[#d9dde3] shadow-[0_12px_30px_rgba(15,23,42,0.08)]"
+        )}>
           {results.map((article) => (
             <Link
               key={article.slug}
               href={`/support/articles/${article.slug}`}
               onClick={() => setQuery("")}
-              className="block border-b border-[#e8ebef] px-4 py-2 text-[12px] text-[#303944] transition last:border-b-0 hover:bg-[#f6f8fa] hover:text-black"
+              className={cn(
+                "block border-b border-gray-100 px-5 py-3 transition last:border-b-0 hover:bg-gray-50",
+                isHero
+                  ? "text-[15px] text-gray-700 hover:text-black"
+                  : "text-[12px] text-[#303944] hover:text-black"
+              )}
             >
               {article.title}
             </Link>

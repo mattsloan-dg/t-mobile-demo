@@ -19,7 +19,7 @@ const markdownComponents: Components = {
   h1: ({ children }) => (
     <h1
       id={buildHeadingId(children)}
-      className="mt-8 text-3xl font-semibold tracking-tight text-[#1b2128]"
+      className="mt-8 text-[28px] font-bold tracking-tight text-[#1a1a1a]"
     >
       {children}
     </h1>
@@ -27,7 +27,7 @@ const markdownComponents: Components = {
   h2: ({ children }) => (
     <h2
       id={buildHeadingId(children)}
-      className="mt-7 text-[34px] font-semibold tracking-tight text-[#1b2128]"
+      className="mt-7 text-[24px] font-bold tracking-tight text-[#1a1a1a]"
     >
       {children}
     </h2>
@@ -35,31 +35,31 @@ const markdownComponents: Components = {
   h3: ({ children }) => (
     <h3
       id={buildHeadingId(children)}
-      className="mt-6 text-[24px] font-semibold tracking-tight text-[#1b2128]"
+      className="mt-6 text-[20px] font-semibold tracking-tight text-[#1a1a1a]"
     >
       {children}
     </h3>
   ),
   p: ({ children }) => (
-    <p className="mt-3 text-[12px] leading-5 text-[#303944]">
+    <p className="mt-3 text-[15px] leading-7 text-gray-600">
       {children}
     </p>
   ),
   ul: ({ children }) => (
-    <ul className="mt-3 list-disc space-y-1.5 pl-5 text-[#303944]">
+    <ul className="mt-3 list-disc space-y-2 pl-6 text-gray-600">
       {children}
     </ul>
   ),
   ol: ({ children }) => (
-    <ol className="mt-3 list-decimal space-y-1.5 pl-5 text-[#303944]">
+    <ol className="mt-3 list-decimal space-y-2 pl-6 text-gray-600">
       {children}
     </ol>
   ),
-  li: ({ children }) => <li className="text-[12px] leading-5">{children}</li>,
+  li: ({ children }) => <li className="text-[15px] leading-7">{children}</li>,
   a: ({ href, children }) => (
     <a
       href={href}
-      className="text-[#131920] underline underline-offset-2"
+      className="text-tm-magenta underline underline-offset-2 hover:text-tm-magenta-hover"
       target={href?.startsWith("http") ? "_blank" : undefined}
       rel={href?.startsWith("http") ? "noreferrer" : undefined}
     >
@@ -67,12 +67,12 @@ const markdownComponents: Components = {
     </a>
   ),
   blockquote: ({ children }) => (
-    <blockquote className="mt-4 border-l-2 border-[#c9ced6] pl-4 text-[#424d59]">
+    <blockquote className="mt-4 border-l-4 border-tm-magenta/30 bg-gray-50 py-3 pl-4 text-gray-600">
       {children}
     </blockquote>
   ),
   code: ({ children }) => (
-    <code className="rounded bg-[#e8ebef] px-1 py-0.5 text-[12px] text-[#27303b]">
+    <code className="rounded bg-gray-100 px-1.5 py-0.5 text-[14px] text-gray-700">
       {children}
     </code>
   ),
@@ -87,36 +87,36 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
     CATEGORY_NAMES[article.category] ?? article.category.replace(/-/g, " ");
 
   return (
-    <div className="mx-auto max-w-[900px] px-5 pb-14 pt-6">
-      <nav className="text-[9px] font-semibold uppercase tracking-[0.14em] text-[#65707e]">
-        <Link href="/support" className="hover:text-black">
-          Help center
+    <div className="mx-auto max-w-[1280px] px-6 pb-14 pt-10">
+      <nav className="text-[13px] text-gray-500">
+        <Link href="/support" className="hover:text-tm-magenta">
+          Support
         </Link>
         <span className="mx-2">/</span>
-        <Link href={`/support/${article.category}`} className="hover:text-black">
+        <Link href={`/support/${article.category}`} className="hover:text-tm-magenta">
           {categoryName}
         </Link>
       </nav>
 
-      <h1 className="mt-2 text-[44px] font-semibold tracking-tight text-[#1b2128]">
+      <h1 className="mt-4 text-[36px] font-bold tracking-tight text-[#1a1a1a]">
         {article.title}
       </h1>
 
-      <article className="mt-4 max-w-[820px]">
+      <article className="mt-6 max-w-[820px]">
         <ReactMarkdown components={markdownComponents}>
           {sanitizeArticleContent(article.content, article.title)}
         </ReactMarkdown>
       </article>
 
-      <section className="mt-10 rounded-md border border-[#d8dde3] bg-[#f8f9fb] p-4">
-        <h2 className="text-[13px] font-semibold text-[#1b2128]">
+      <section className="mt-10 rounded-xl border border-gray-200 bg-gray-50 p-6">
+        <h2 className="text-[16px] font-semibold text-[#1a1a1a]">
           Was this article helpful?
         </h2>
-        <div className="mt-2 flex gap-2">
-          <button className="rounded-full border border-[#c9ced6] px-3 py-1 text-[11px] text-[#2f3945] hover:text-black">
+        <div className="mt-3 flex gap-3">
+          <button className="rounded-full border border-gray-300 px-5 py-2 text-[14px] font-medium text-gray-600 transition hover:border-tm-magenta hover:text-tm-magenta">
             Yes
           </button>
-          <button className="rounded-full border border-[#c9ced6] px-3 py-1 text-[11px] text-[#2f3945] hover:text-black">
+          <button className="rounded-full border border-gray-300 px-5 py-2 text-[14px] font-medium text-gray-600 transition hover:border-tm-magenta hover:text-tm-magenta">
             No
           </button>
         </div>

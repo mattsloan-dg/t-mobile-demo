@@ -1,9 +1,9 @@
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap");
 @import "tailwindcss";
 
 :root {
-  --background: #000000;
-  --foreground: #e8e9ea;
+  --background: #ffffff;
+  --foreground: #1a1a1a;
 }
 
 @theme inline {
@@ -31,29 +31,29 @@ body {
   font-family: "Inter", sans-serif;
 }
 
-/* Custom scrollbar for dark theme */
+/* Default scrollbar (light theme) */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #000;
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #2F3336;
+  background: #d1d5db;
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #3F4346;
+  background: #9ca3af;
 }
 
 /* Firefox scrollbar */
 * {
   scrollbar-width: thin;
-  scrollbar-color: #2f3336 #000;
+  scrollbar-color: #d1d5db transparent;
 }
 
 @keyframes highlightGlow {

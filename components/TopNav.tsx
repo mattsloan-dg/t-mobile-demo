@@ -1,42 +1,85 @@
+"use client";
+
 import Link from "next/link";
+import { usePathname } from "next/navigation";
+import type { Category } from "@/lib/articles";
+import { cn } from "@/lib/utils";
 
-const NAV_LINKS = [
-  "Plans",
-  "Devices",
-  "Deals",
-  "Coverage",
-  "Support",
-];
+interface TopNavProps {
+  categories: Category[];
+}
 
-export default function TopNav() {
+export default function TopNav({ categories }: TopNavProps) {
+  const pathname = usePathname();
+
   return (
-    <header className="fixed inset-x-0 top-0 z-40 border-b border-white/10 bg-black">
-      <div className="mx-auto flex h-11 max-w-[1280px] items-center justify-between px-4">
-        <Link href="/support" className="flex items-center gap-1.5">
-          <span className="text-[14px] font-bold tracking-tight text-tm-magenta">
-            T-Mobile
-          </span>
-        </Link>
+    <header className="sticky top-0 z-40">
+      {/* Primary nav bar */}
+      <div className="bg-black">
+        <div className="mx-auto flex h-16 max-w-[1280px] items-center justify-between px-6">
+          <Link href="/support" className="flex items-center">
+            <span className="text-[28px] font-extrabold tracking-tight text-tm-magenta">
+              T-Mobile
+            </span>
+          </Link>
 
-        <nav className="hidden items-center gap-4 md:flex">
-          {NAV_LINKS.map((item) => (
+          <nav className="hidden items-center gap-6 md:flex">
+            {categories.map((category) => (
+              <Link
+                key={category.slug}
+                href={`/support/${category.slug}`}
+                className="text-[14px] font-medium text-white/80 transition-colors hover:text-white"
+              >
+                {category.name}
+              </Link>
+            ))}
+          </nav>
+
+          <div className="flex items-center gap-3">
             <Link
-              key={item}
-              href={`/${item.toLowerCase().replace(/\s+/g, "-")}`}
-              className="text-[10px] font-medium text-white/70 transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:ring-offset-2 focus-visible:ring-offset-black rounded-sm"
+              href="/support"
+              className="rounded-full border border-white/30 px-5 py-2 text-[13px] font-medium text-white transition hover:border-white hover:bg-white/10"
             >
-              {item}
+              Log in
             </Link>
-          ))}
-        </nav>
+          </div>
+        </div>
+      </div>
 
-        <div className="flex items-center gap-2">
-          <button className="rounded-full border border-white/30 px-3 py-1 text-[10px] font-medium text-white transition hover:border-white">
-            Log in
-          </button>
-          <button className="rounded-full bg-tm-magenta px-3 py-1 text-[10px] font-semibold text-white transition hover:bg-tm-magenta-hover">
-            Sign up
-          </button>
+      {/* Support sub-nav breadcrumb strip */}
+      <div className="border-b border-gray-200 bg-white">
+        <div className="mx-auto flex h-12 max-w-[1280px] items-center gap-6 px-6">
+          <Link
+            href="/support"
+            className={cn(
+              "text-[13px] font-semibold transition-colors",
+              pathname === "/support"
+                ? "text-tm-magenta"
+                : "text-gray-600 hover:text-tm-magenta"
+            )}
+          >
+            Support Home
+          </Link>
+          {categories.map((category) => {
+            const isActive =
+              pathname === `/support/${category.slug}` ||
+              pathname.startsWith(`/support/${category.slug}/`);
+
+            return (
+              <Link
+                key={category.slug}
+                href={`/support/${category.slug}`}
+                className={cn(
+                  "hidden text-[13px] font-medium transition-colors md:block",
+                  isActive
+                    ? "text-tm-magenta"
+                    : "text-gray-500 hover:text-tm-magenta"
+                )}
+              >
+                {category.name}
+              </Link>
+            );
+          })}
         </div>
       </div>
     </header>

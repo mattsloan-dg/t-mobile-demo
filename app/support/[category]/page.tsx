@@ -18,26 +18,32 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
   }
 
   return (
-    <section className="mx-auto max-w-[900px] px-5 pb-14 pt-6">
-      <p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-[#65707e]">
-        Help center
-      </p>
-      <h1 className="mt-2 text-[44px] font-semibold tracking-tight text-[#1b2128]">
+    <section className="mx-auto max-w-[1280px] px-6 pb-14 pt-10">
+      <nav className="text-[13px] text-gray-500">
+        <Link href="/support" className="hover:text-tm-magenta">
+          Support
+        </Link>
+        <span className="mx-2">/</span>
+        <span className="font-medium text-gray-900">{category.name}</span>
+      </nav>
+
+      <h1 className="mt-4 text-[36px] font-bold tracking-tight text-[#1a1a1a]">
         {category.name}
       </h1>
 
-      <ul className="mt-6 columns-1 gap-x-10 space-y-2 sm:columns-2">
+      <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {category.articles.map((article) => (
-          <li key={article.slug} className="break-inside-avoid">
-            <Link
-              href={`/support/articles/${article.slug}`}
-              className="block py-0.5 text-[11px] text-[#2f3945] transition hover:text-black"
-            >
+          <Link
+            key={article.slug}
+            href={`/support/articles/${article.slug}`}
+            className="group rounded-xl border border-gray-200 bg-white p-5 transition-all hover:border-gray-300 hover:shadow-md"
+          >
+            <span className="text-[15px] font-medium text-gray-800 transition-colors group-hover:text-tm-magenta">
               {article.title}
-            </Link>
-          </li>
+            </span>
+          </Link>
         ))}
-      </ul>
+      </div>
     </section>
   );
 }

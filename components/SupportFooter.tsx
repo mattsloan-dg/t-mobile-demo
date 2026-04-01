@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 const FOOTER_COLUMNS = [
   {
     title: "Services",
@@ -15,18 +17,26 @@ const FOOTER_COLUMNS = [
 
 export default function SupportFooter() {
   return (
-    <footer className="mt-12 bg-[#1d1d1f] text-white">
-      <div className="mx-auto max-w-[1280px] px-4 py-6">
-        <div className="grid gap-6 border-b border-white/15 pb-5 md:grid-cols-3">
+    <footer className="border-t border-gray-200 bg-[#1a1a1a] text-white">
+      <div className="mx-auto max-w-[1280px] px-6 py-10">
+        <div className="flex items-center gap-2 pb-8">
+          <span className="text-[24px] font-extrabold tracking-tight text-tm-magenta">
+            T-Mobile
+          </span>
+        </div>
+
+        <div className="grid gap-8 border-b border-white/10 pb-8 md:grid-cols-3">
           {FOOTER_COLUMNS.map((column) => (
             <section key={column.title}>
-              <h2 className="text-[10px] font-semibold uppercase tracking-[0.1em] text-white/70">
+              <h2 className="text-[12px] font-semibold uppercase tracking-wider text-white/50">
                 {column.title}
               </h2>
-              <ul className="mt-2 space-y-1">
+              <ul className="mt-3 space-y-2">
                 {column.items.map((item) => (
-                  <li key={item} className="text-[11px] text-white/85">
-                    {item}
+                  <li key={item}>
+                    <span className="text-[14px] text-white/70 transition-colors hover:text-white cursor-default">
+                      {item}
+                    </span>
                   </li>
                 ))}
               </ul>
@@ -34,19 +44,16 @@ export default function SupportFooter() {
           ))}
         </div>
 
-        <div className="pt-4">
-          <p className="max-w-4xl text-[10px] leading-5 text-white/70">
+        <div className="flex flex-col gap-2 pt-6 md:flex-row md:items-center md:justify-between">
+          <p className="max-w-2xl text-[13px] leading-6 text-white/50">
             This help center is for demo purposes and references publicly
             available T-Mobile support content. T-Mobile and related marks are
             property of their owners.
           </p>
-          <p className="mt-3 text-[10px] text-white/60">
+          <p className="text-[13px] text-white/40">
             © 2026 T-Mobile demo experience.
           </p>
         </div>
-      </div>
-      <div className="px-4 pb-2 text-[72px] font-semibold leading-none tracking-tight text-tm-magenta">
-        T-Mobile
       </div>
     </footer>
   );
