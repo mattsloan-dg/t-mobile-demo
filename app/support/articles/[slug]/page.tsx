@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
+import remarkGfm from "remark-gfm";
 import {
   CATEGORY_NAMES,
   getAllSlugs,
@@ -76,6 +77,26 @@ const markdownComponents: Components = {
       {children}
     </code>
   ),
+  table: ({ children }) => (
+    <div className="mt-4 overflow-x-auto">
+      <table className="w-full border-collapse text-[15px]">
+        {children}
+      </table>
+    </div>
+  ),
+  thead: ({ children }) => (
+    <thead className="bg-gray-50 text-left text-[13px] font-semibold uppercase tracking-wide text-gray-500">
+      {children}
+    </thead>
+  ),
+  tbody: ({ children }) => <tbody className="divide-y divide-gray-200">{children}</tbody>,
+  tr: ({ children }) => <tr className="border-b border-gray-200">{children}</tr>,
+  th: ({ children }) => (
+    <th className="px-4 py-3 text-left font-semibold text-gray-700">{children}</th>
+  ),
+  td: ({ children }) => (
+    <td className="px-4 py-3 text-gray-600">{children}</td>
+  ),
 };
 
 export default async function ArticlePage({ params }: ArticlePageProps) {
@@ -103,7 +124,7 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
       </h1>
 
       <article className="mt-6 max-w-[820px]">
-        <ReactMarkdown components={markdownComponents}>
+        <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
           {sanitizeArticleContent(article.content, article.title)}
         </ReactMarkdown>
       </article>

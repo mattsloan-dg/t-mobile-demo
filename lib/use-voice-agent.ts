@@ -53,7 +53,7 @@ export function useVoiceAgent() {
   const [activityEvents, setActivityEvents] = useState<ActivityEvent[]>([]);
   const [currentVoice, setCurrentVoice] = useState("aura-2-thalia-en");
   const [currentLlm, setCurrentLlm] = useState(
-    "anthropic:claude-sonnet-4-20250514"
+    "anthropic:claude-sonnet-4-6"
   );
   const [articleContext, setArticleContext] = useState("");
   const [articleCatalog, setArticleCatalog] = useState<ArticleSummary[]>([]);
@@ -246,29 +246,34 @@ export function useVoiceAgent() {
       agentRef.current = agent;
 
       agent.on("open", () => {
-        session
-          .startMic((audioData: ArrayBuffer) => {
-            agent.sendAudio(audioData);
-          })
-          .then(() => {
-            agent.sendSettings(buildSettings());
-          })
-          .catch((err) => {
-            logger.error("Microphone error", {
-              error: err instanceof Error ? err.message : String(err),
-            });
-            setIsConnecting(false);
-            setOrbState("idle");
-          });
+        logger.info("WebSocket connected, waiting for Welcome message");
       });
 
       agent.on("message", (msg: VAServerMessage) => {
         switch (msg.type) {
+          case "Welcome":
+            logger.info("Welcome received, sending settings", { request_id: msg.request_id });
+            agent.sendSettings(buildSettings());
+            break;
+
           case "SettingsApplied":
-            logger.info("Agent ready", { event: msg.type });
-            setIsActive(true);
-            setIsConnecting(false);
-            setOrbState("listening");
+            logger.info("Settings applied, starting microphone");
+            session
+              .startMic((audioData: ArrayBuffer) => {
+                agent.sendAudio(audioData);
+              })
+              .then(() => {
+                setIsActive(true);
+                setIsConnecting(false);
+                setOrbState("listening");
+              })
+              .catch((err) => {
+                logger.error("Microphone error", {
+                  error: err instanceof Error ? err.message : String(err),
+                });
+                setIsConnecting(false);
+                setOrbState("idle");
+              });
             break;
 
           case "ThinkUpdated":

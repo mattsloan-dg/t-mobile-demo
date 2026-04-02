@@ -13,7 +13,7 @@ export interface FunctionDefinition {
   parameters: Record<string, unknown>;
 }
 
-/** Settings message - must be sent immediately after WebSocket connects */
+/** Settings message - must be sent after receiving the Welcome message */
 export interface VASettings {
   type: "Settings";
   audio: {

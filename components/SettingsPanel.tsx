@@ -22,17 +22,45 @@ const VOICE_OPTIONS = [
 ];
 
 const LLM_OPTIONS = [
+  // Anthropic
+  { label: "Claude Sonnet 4.6", value: "anthropic:claude-sonnet-4-6", provider: "anthropic" },
+  { label: "Claude Sonnet 4.5", value: "anthropic:claude-sonnet-4-5", provider: "anthropic" },
   { label: "Claude Sonnet 4", value: "anthropic:claude-sonnet-4-20250514", provider: "anthropic" },
-  { label: "Claude 3.5 Haiku", value: "anthropic:claude-3-5-haiku-latest", provider: "anthropic" },
+  { label: "Claude Haiku 4.5", value: "anthropic:claude-4-5-haiku-latest", provider: "anthropic" },
+  { label: "Claude Haiku 3.5", value: "anthropic:claude-3-5-haiku-latest", provider: "anthropic" },
+  // OpenAI
+  { label: "GPT 5.4", value: "open_ai:gpt-5.4", provider: "open_ai" },
+  { label: "GPT-5.4 mini", value: "open_ai:gpt-5.4-mini", provider: "open_ai" },
+  { label: "GPT-5.4 nano", value: "open_ai:gpt-5.4-nano", provider: "open_ai" },
+  { label: "GPT-5.3 Instant", value: "open_ai:gpt-5.3-chat-latest", provider: "open_ai" },
+  { label: "GPT 5.2", value: "open_ai:gpt-5.2", provider: "open_ai" },
+  { label: "GPT-5.2 Instant", value: "open_ai:gpt-5.2-chat-latest", provider: "open_ai" },
+  { label: "GPT-5.1 Thinking", value: "open_ai:gpt-5.1", provider: "open_ai" },
+  { label: "GPT-5.1 Instant", value: "open_ai:gpt-5.1-chat-latest", provider: "open_ai" },
+  { label: "GPT-5", value: "open_ai:gpt-5", provider: "open_ai" },
+  { label: "GPT-5 mini", value: "open_ai:gpt-5-mini", provider: "open_ai" },
+  { label: "GPT-5 nano", value: "open_ai:gpt-5-nano", provider: "open_ai" },
+  { label: "GPT-4.1", value: "open_ai:gpt-4.1", provider: "open_ai" },
+  { label: "GPT-4.1 mini", value: "open_ai:gpt-4.1-mini", provider: "open_ai" },
+  { label: "GPT-4.1 nano", value: "open_ai:gpt-4.1-nano", provider: "open_ai" },
   { label: "GPT-4o", value: "open_ai:gpt-4o", provider: "open_ai" },
-  { label: "GPT-4o Mini", value: "open_ai:gpt-4o-mini", provider: "open_ai" },
+  { label: "GPT-4o mini", value: "open_ai:gpt-4o-mini", provider: "open_ai" },
+  // Google
+  { label: "Gemini 3.0 Pro Preview", value: "google:gemini-3-pro-preview", provider: "google" },
+  { label: "Gemini 3.0 Flash Preview", value: "google:gemini-3-flash-preview", provider: "google" },
+  { label: "Gemini 3.1 Flash Lite", value: "google:gemini-3.1-flash-lite", provider: "google" },
+  { label: "Gemini 2.5 Flash", value: "google:gemini-2.5-flash", provider: "google" },
+  { label: "Gemini 2.0 Flash Lite", value: "google:gemini-2.5-flash-lite", provider: "google" },
   { label: "Gemini 2.0 Flash", value: "google:gemini-2.0-flash", provider: "google" },
+  // Groq
+  { label: "GPT OSS 20B", value: "groq:openai/gpt-oss-20b", provider: "groq" },
 ];
 
 const PROVIDER_COLORS: Record<string, string> = {
   anthropic: "#D97757",
   open_ai: "#10A37F",
   google: "#4285F4",
+  groq: "#F55036",
 };
 
 /* ------------------------------------------------------------------ */
@@ -306,7 +334,7 @@ export default function SettingsPanel({
               <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-tm-magenta" />
             </span>
             <span className="text-sm text-tm-text font-medium">
-              Deepgram Nova-3
+              Deepgram Flux
             </span>
           </div>
           <span className="text-[10px] font-semibold uppercase tracking-wider bg-tm-magenta/15 text-tm-magenta px-2 py-0.5 rounded-full">

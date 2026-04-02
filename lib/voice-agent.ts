@@ -114,7 +114,7 @@ export class VoiceAgent {
   // Sending messages
   // ---------------------------------------------------------------------------
 
-  /** Send the initial Settings configuration immediately after connecting. */
+  /** Send the initial Settings configuration after receiving the Welcome message. */
   sendSettings(settings: VASettings): void {
     this.send(settings);
   }
@@ -160,7 +160,7 @@ export class VoiceAgent {
     const msg: VAUpdateThink = {
       type: "UpdateThink",
       think: {
-        provider: provider ?? { type: "anthropic", model: "claude-sonnet-4-20250514", temperature: 0.7 },
+        provider: provider ?? { type: "anthropic", model: "claude-sonnet-4-6", temperature: 0.7 },
         prompt,
         functions,
       },
