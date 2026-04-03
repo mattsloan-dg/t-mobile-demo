@@ -6,6 +6,7 @@ import type {
   FunctionDefinition,
   VAServerMessage,
   ActivityEvent,
+  WSLogEntry,
 } from "./types";
 import { createLogger } from "./logger";
 
@@ -26,6 +27,7 @@ export type VoiceAgentEventMap = {
   message: (message: VAServerMessage) => void;
   audio: (data: ArrayBuffer) => void;
   activity: (event: ActivityEvent) => void;
+  ws_log: (entry: WSLogEntry) => void;
 };
 
 type GenericListener = (...args: unknown[]) => void;
@@ -83,7 +85,17 @@ export class VoiceAgent {
         // Text frame -> JSON control message
         try {
           const msg = JSON.parse(event.data as string) as VAServerMessage;
+
+          // Server echoes FunctionCallResponse as an acknowledgment — skip it
+          if (msg.type === "FunctionCallResponse") return;
+
           logger.debug("Server message received", { type: msg.type, payload: msg });
+          this.emit("ws_log", {
+            direction: "received",
+            messageType: msg.type,
+            payload: msg as unknown as Record<string, unknown>,
+            timestamp: Date.now(),
+          });
           this.emit("message", msg);
           this.handleActivityEvents(msg);
         } catch (err) {
@@ -229,6 +241,12 @@ export class VoiceAgent {
       const typed = data as { type?: string };
       if (typed.type !== "KeepAlive") {
         logger.debug("Sending message", { type: typed.type, payload: data });
+        this.emit("ws_log", {
+          direction: "sent",
+          messageType: typed.type || "unknown",
+          payload: data as Record<string, unknown>,
+          timestamp: Date.now(),
+        });
       }
       this.ws.send(JSON.stringify(data));
     }

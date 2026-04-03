@@ -8,40 +8,35 @@ describe("agent function definitions", () => {
 
     expect(names).toContain("navigate_to_article");
     expect(names).toContain("search_help_articles");
-    expect(names).toContain("transfer_to_agent");
+    expect(names).toContain("escalate_call");
     expect(names).not.toContain("escalate_to_human");
   });
 
-  it("2fa agent includes identity and 2fa tools", () => {
-    const config = getAgentConfig("2fa");
+  it("billing agent includes identity, billing lookup, and escalation tools", () => {
+    const config = getAgentConfig("billing");
     const names = config.functions.map((definition) => definition.name);
 
     expect(names).toContain("verify_identity");
-    expect(names).toContain("check_2fa_method");
+    expect(names).toContain("lookup_billing");
     expect(names).toContain("escalate_to_human");
-    expect(names).not.toContain("check_account_status");
-    expect(names).not.toContain("send_password_reset_email");
   });
 
-  it("account lockout agent includes identity, status, and password reset tools", () => {
-    const config = getAgentConfig("account_lockout");
+  it("cancellation agent only has escalate_to_human", () => {
+    const config = getAgentConfig("cancellation");
     const names = config.functions.map((definition) => definition.name);
 
-    expect(names).toContain("verify_identity");
-    expect(names).toContain("check_account_status");
-    expect(names).toContain("send_password_reset_email");
     expect(names).toContain("escalate_to_human");
-    expect(names).not.toContain("check_2fa_method");
+    expect(names).toHaveLength(1);
   });
 
-  it("2fa and account lockout agents both have escalate_to_human", () => {
-    const twoFa = getAgentConfig("2fa");
-    const lockout = getAgentConfig("account_lockout");
+  it("billing and cancellation agents both have escalate_to_human", () => {
+    const billing = getAgentConfig("billing");
+    const cancellation = getAgentConfig("cancellation");
 
-    const twoFaNames = twoFa.functions.map((f) => f.name);
-    const lockoutNames = lockout.functions.map((f) => f.name);
+    const billingNames = billing.functions.map((f) => f.name);
+    const cancellationNames = cancellation.functions.map((f) => f.name);
 
-    expect(twoFaNames).toContain("escalate_to_human");
-    expect(lockoutNames).toContain("escalate_to_human");
+    expect(billingNames).toContain("escalate_to_human");
+    expect(cancellationNames).toContain("escalate_to_human");
   });
 });

@@ -23,40 +23,30 @@ export const FUNCTION_HANDLERS: Record<
     });
   },
 
-  check_account_status: async ({ user_id }) => {
-    await delay(500);
-    return JSON.stringify({
-      user_id,
-      status: "locked",
-      lock_reason: "multiple_failed_login_attempts",
-      locked_since: "2026-02-25T14:30:00Z",
-      failed_attempts: 5,
-      last_successful_login: "2026-02-24T09:15:00Z",
-    });
-  },
-
-  send_password_reset_email: async ({ email }) => {
+  lookup_billing: async ({ user_id }) => {
     await delay(600);
     return JSON.stringify({
-      sent: true,
-      email_masked: email
-        ? email.replace(/(.{2})(.*)(@.*)/, "$1***$3")
-        : "unknown",
-      expires_in: "30 minutes",
-      message:
-        "Password reset email sent successfully. The link will expire in 30 minutes.",
-    });
-  },
-
-  check_2fa_method: async ({ user_id }) => {
-    await delay(400);
-    return JSON.stringify({
       user_id,
-      method: "authenticator_app",
-      app_name: "Google Authenticator",
-      backup_codes_available: true,
-      sms_fallback_available: true,
-      last_2fa_used: "2026-02-24T09:15:00Z",
+      plan: "T-Mobile Go5G Plus",
+      monthly_charge: "$90.00",
+      next_payment_due: "2026-04-15",
+      autopay_enabled: true,
+      account_balance: "$0.00",
+      last_payment: {
+        amount: "$90.00",
+        date: "2026-03-15",
+        method: "Visa ending in 4821",
+      },
+      data_usage: {
+        used_gb: 28.4,
+        plan_limit: "Unlimited",
+        hotspot_used_gb: 12.1,
+        hotspot_limit_gb: 50,
+      },
+      additional_charges: [
+        { description: "Device payment - iPhone 16 Pro", amount: "$27.78" },
+        { description: "T-Mobile Protection 360", amount: "$18.00" },
+      ],
     });
   },
 
@@ -93,11 +83,11 @@ export const FUNCTION_HANDLERS: Record<
 
   // Transfer functions return a simple acknowledgment.
   // The actual agent switch is handled client-side via UpdateThink.
-  transfer_to_agent: async ({ transfer_to, reason }) => {
-    if (transfer_to === "human") {
-      return JSON.stringify({ transferred: true });
+  escalate_call: async ({ escalate_to, reason }) => {
+    if (escalate_to === "human") {
+      return JSON.stringify({ escalated: true });
     }
-    return JSON.stringify({ transferred: true });
+    return JSON.stringify({ escalated: true });
   },
 
 };

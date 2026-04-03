@@ -210,6 +210,18 @@ export type VAServerMessage =
   | VAWarning;
 
 // -----------------------------------------------------------------------------
+// WebSocket Log Entries (used by the WebSocket log side panel)
+// -----------------------------------------------------------------------------
+
+/** A single WebSocket message (sent or received) for the debug log panel */
+export interface WSLogEntry {
+  direction: "sent" | "received" | "external";
+  messageType: string;
+  payload: Record<string, unknown>;
+  timestamp: number;
+}
+
+// -----------------------------------------------------------------------------
 // Activity Feed Events (used by the UI activity panel)
 // -----------------------------------------------------------------------------
 

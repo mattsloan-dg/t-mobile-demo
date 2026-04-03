@@ -289,11 +289,14 @@ export function createAudioPlayer(): {
 export function createVoiceSession(): {
   startMic: (onAudioData: (data: ArrayBuffer) => void) => Promise<void>;
   stopMic: () => void;
+  muteMic: () => void;
+  unmuteMic: () => void;
   playAudio: (data: ArrayBuffer) => void;
   clearAudio: () => void;
   isPlaying: () => boolean;
 } {
   let processor: { start: () => void; stop: () => void } | null = null;
+  let micStream: MediaStream | null = null;
   const player = createAudioPlayer();
 
   async function startMic(
@@ -303,6 +306,7 @@ export function createVoiceSession(): {
     stopMic();
 
     const stream = await getMicrophoneStream();
+    micStream = stream;
     processor = createAudioProcessor(stream, onAudioData);
     processor.start();
   }
@@ -311,6 +315,23 @@ export function createVoiceSession(): {
     if (processor) {
       processor.stop();
       processor = null;
+    }
+    micStream = null;
+  }
+
+  function muteMic(): void {
+    if (micStream) {
+      for (const track of micStream.getAudioTracks()) {
+        track.enabled = false;
+      }
+    }
+  }
+
+  function unmuteMic(): void {
+    if (micStream) {
+      for (const track of micStream.getAudioTracks()) {
+        track.enabled = true;
+      }
     }
   }
 
@@ -326,5 +347,5 @@ export function createVoiceSession(): {
     return player.isPlaying();
   }
 
-  return { startMic, stopMic, playAudio, clearAudio, isPlaying };
+  return { startMic, stopMic, muteMic, unmuteMic, playAudio, clearAudio, isPlaying };
 }

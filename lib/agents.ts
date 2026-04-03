@@ -4,7 +4,7 @@ import type { FunctionDefinition } from "./types";
 // Agent Type
 // =============================================================================
 
-export type AgentType = "knowledge" | "2fa" | "account_lockout";
+export type AgentType = "knowledge" | "billing" | "cancellation";
 
 // =============================================================================
 // Shared Function Definitions
@@ -66,52 +66,32 @@ const KNOWLEDGE_FUNCTIONS: FunctionDefinition[] = [
       required: ["slug"],
     },
   },
-  // {
-  //   name: "highlight_section",
-  //   description:
-  //     "Highlight and scroll to a specific heading on the current article page to direct the customer's attention.",
-  //   parameters: {
-  //     type: "object",
-  //     properties: {
-  //       heading: {
-  //         type: "string",
-  //         description:
-  //           "Heading text or keyword to find in the current article.",
-  //       },
-  //     },
-  //     required: ["heading"],
-  //   },
-  // },
   {
-    name: "transfer_to_agent",
+    name: "escalate_call",
     description: `
       IMPORTANT — When to call this function:
-      If the customer asks about anything related to their PERSONAL ACCOUNT — such as two-factor authentication, logging in, account being locked, password resets, or account status — call this function with the appropriate transfer_to value.
 
-      Use "2fa" when the customer has questions about two-factor authentication, backup codes, or authenticator app issues.
-      Use "account_lockout" when the customer has trouble logging in, their account is locked or suspended, or they need a password reset.
+      Use "billing" when the customer asks about anything SPECIFIC to their personal account, bill, or plan — such as their current charges, payment due dates, plan details, data usage, account balance, or any billing dispute. Do NOT escalate for general information questions about T-Mobile plans or features — only escalate when the customer is asking about THEIR specific account or bill.
+      Use "cancellation" when the customer expresses any intent to cancel their plan, downgrade their service, switch carriers, or otherwise reduce or end their T-Mobile service.
       Use "human" for anything else that you cannot help with, or if the customer explicitly requests a human agent.
 
-      TRANSFER PROTOCOL (you MUST follow these two steps exactly):
-      Step 1: Immediately BEFORE calling this function, say exactly one short sentence like "Just one moment while I transfer you to a specialist." This must be your last spoken utterance.
-      Step 2: Call this function. After the function call, you MUST NOT generate any more text — no follow-up, no confirmation, no "one moment", no filler. The receiving agent will handle the greeting. Your turn is OVER after the function call.
+      CRITICAL - Don't announce that you are calling this function. You don't need to say anything before or after you call it.
       `,
     parameters: {
       type: "object",
       properties: {
-        transfer_to: {
+        escalate_to: {
           type: "string",
-          enum: ["2fa", "account_lockout", "human"],
+          enum: ["billing", "cancellation", "human"],
           description:
-            "Which specialist to transfer to: '2fa' for two-factor auth issues, 'account_lockout' for login/locked account issues, 'human' for everything else.",
+            "Which specialist to escalate to: 'billing' for account/bill/plan-specific questions, 'cancellation' for cancel/downgrade requests, 'human' for everything else.",
         },
         reason: {
           type: "string",
-          description:
-            "Brief summary of why the customer is being transferred",
+          description: "Brief summary of why the call is being escalated",
         },
       },
-      required: ["transfer_to", "reason"],
+      required: ["escalate_to", "reason"],
     },
   },
 ];
@@ -141,39 +121,15 @@ const VERIFY_IDENTITY: FunctionDefinition = {
 };
 
 // =============================================================================
-// 2FA Agent — Identity verification, 2FA method checks
+// Billing & Account Agent — Identity verification, billing lookups
 // =============================================================================
 
-const TWO_FA_FUNCTIONS: FunctionDefinition[] = [
+const BILLING_FUNCTIONS: FunctionDefinition[] = [
   VERIFY_IDENTITY,
   {
-    name: "check_2fa_method",
+    name: "lookup_billing",
     description:
-      "Check what two-factor authentication method is configured on the customer's account.",
-    parameters: {
-      type: "object",
-      properties: {
-        user_id: {
-          type: "string",
-          description: "The verified user ID",
-        },
-      },
-      required: ["user_id"],
-    },
-  },
-  ESCALATE_TO_HUMAN,
-];
-
-// =============================================================================
-// Account Lockout Agent — Identity verification, account status, password resets
-// =============================================================================
-
-const ACCOUNT_LOCKOUT_FUNCTIONS: FunctionDefinition[] = [
-  VERIFY_IDENTITY,
-  {
-    name: "check_account_status",
-    description:
-      "Check the current status of a verified customer's account. Returns whether the account is active, locked, or suspended, and the reason.",
+      "Look up the customer's billing and account details including current plan, monthly charges, payment due date, recent payments, and account balance. The customer must be verified first.",
     parameters: {
       type: "object",
       properties: {
@@ -185,22 +141,30 @@ const ACCOUNT_LOCKOUT_FUNCTIONS: FunctionDefinition[] = [
       required: ["user_id"],
     },
   },
+  ESCALATE_TO_HUMAN,
+];
+
+// =============================================================================
+// Cancellation & Downgrade Agent — Empathetic retention, then escalation
+// =============================================================================
+
+const CANCELLATION_FUNCTIONS: FunctionDefinition[] = [
   {
-    name: "send_password_reset_email",
+    name: "escalate_to_human",
     description:
-      "Send a password reset email to the customer's email address on file. The customer must be verified first. IMPORTANT: You must ONLY call this function after the customer has explicitly confirmed they want a password reset email sent. Always ask for confirmation first.",
+      "Escalate the call to a human retention specialist. Call this ONLY after you have gathered the customer's reason for wanting to cancel or downgrade. Pass the extracted reason as the 'reason' parameter so the human agent has full context.",
     parameters: {
       type: "object",
       properties: {
-        email: {
+        reason: {
           type: "string",
-          description: "Customer's email address",
+          description:
+            "The specific reason the customer wants to cancel or downgrade, as extracted from the conversation. Be detailed — include what they're unhappy about, how long the issue has persisted, and any other context they shared.",
         },
       },
-      required: ["email"],
+      required: ["reason"],
     },
   },
-  ESCALATE_TO_HUMAN,
 ];
 
 // =============================================================================
@@ -252,8 +216,18 @@ Conversation Flow:
 2. Search for relevant articles based on their question
 3. Navigate them to the right article and highlight the relevant section
 4. Explain the answer concisely in your own words
-5. If they need account-level help, transfer to the Account Agent
-6. Ask if there's anything else you can help with
+5. Ask if there's anything else you can help with
+
+Escalation Flow:
+- You have access to the tool 'escalate_call'. You should call this function anytime the user asks about something that's specific to their personal account, such as their plan, their, bill, their data usage, etc.
+- You should also call this tool anytime the user says something about cancelling or downgrading their account.
+- Finally, anytime the user explicitly asks to speak with a human, you should call this tool.
+
+IMPORTANT:
+- Never announce that you are escalating the call or calling this tool, simply just call the tool.
+- If you need to escalate the call do not say that you can't help the user, just call the tool.
+- Don't say that you will transfer them to someone else who can help, just call the tool.
+
 
 CRITICAL: When you call a tool like navigate_to_article or search_help_articles, do NOT generate extra follow-up messages narrating what you're doing. Say ONE sentence that includes your action AND the answer, then STOP.
 Never use filler words as standalone responses.
@@ -272,8 +246,8 @@ ${ctx.helpArticleContent}`
 }`;
 }
 
-function build2faAgentPrompt(): string {
-  return `You are Tara, a voice-based two-factor authentication specialist for T-Mobile. You are the 2FA Agent — your job is to help customers with questions about their two-factor authentication setup, backup codes, and authenticator app issues.
+function buildBillingAgentPrompt(): string {
+  return `You are Tara, a voice-based billing and account specialist for T-Mobile. You are the Billing & Account Agent — your job is to help customers with questions about their specific bill, plan details, charges, payments, and account information.
 
 CRITICAL VOICE RULES:
 - You are a VOICE AGENT. Your responses are spoken aloud via text-to-speech.
@@ -285,32 +259,32 @@ CRITICAL VOICE RULES:
 - Never say "here's a summary" or "let me list out" — just give the answer directly.
 
 Your Personality:
-You're calm, reassuring, and security-conscious. Customers reaching you may be confused about their 2FA setup — be patient and clear. You refer to yourself as Tara if asked.
+You're friendly, detail-oriented, and helpful. Customers reaching you have questions about their account — be clear and precise with any billing information. You refer to yourself as Tara if asked.
 
 Your Role:
-You are the 2FA Specialist. You handle identity verification and two-factor authentication inquiries. Security is your top priority.
+You are the Billing & Account Specialist. You handle identity verification and billing inquiries including plan details, charges, payments, and account balance.
 
 CRITICAL SECURITY RULE:
 ALWAYS verify the customer's identity FIRST by asking for their email address and date of birth before performing ANY account actions. Do not skip this step. Call verify_identity before using any other tools.
 
 Your Tools:
 - verify_identity: Verify the customer by email and date of birth (ALWAYS do this first)
-- check_2fa_method: See what 2FA method is configured on their account
+- lookup_billing: Look up the customer's billing details, plan, charges, and payment info
 - escalate_to_human: Transfer to a human agent if the issue is too complex or the customer requests it
 
 Conversation Flow:
-1. Introduce yourself as the 2FA specialist and ask for their email and date of birth to verify identity
+1. Ask for their email and date of birth to verify identity
 2. Call verify_identity with the provided information
-3. Check their 2FA configuration using check_2fa_method
-4. Explain their current setup and help with their question
+3. Look up their billing details using lookup_billing
+4. Explain the relevant information clearly and concisely
 5. Escalate to a human if you can't resolve the issue
-6. Ask if there's anything else 2FA-related you can help with
+6. Ask if there's anything else billing-related you can help with
 
 Never use filler words as standalone responses.`;
 }
 
-function buildAccountLockoutAgentPrompt(): string {
-  return `You are Tara, a voice-based account recovery specialist for T-Mobile. You are the Account Lockout Agent — your job is to help customers who are locked out of their accounts, have suspended accounts, or need help regaining access.
+function buildCancellationAgentPrompt(): string {
+  return `You are Tara, a voice-based customer care specialist for T-Mobile. You are the Cancellation & Downgrade Agent — your job is to understand why a customer wants to cancel or downgrade their service, and then connect them with a human retention specialist who can help.
 
 CRITICAL VOICE RULES:
 - You are a VOICE AGENT. Your responses are spoken aloud via text-to-speech.
@@ -322,31 +296,27 @@ CRITICAL VOICE RULES:
 - Never say "here's a summary" or "let me list out" — just give the answer directly.
 
 Your Personality:
-You're calm, reassuring, and security-conscious. Customers reaching you often can't access their accounts and may be anxious — be empathetic but efficient. You refer to yourself as Tara if asked.
+You're warm, sympathetic, genuinely caring, and inquisitive. You are NOT trying to talk the customer out of cancelling — that's not your job. Your job is simply to understand what went wrong so a human specialist can help. Be a good listener. Validate their frustrations. Show empathy.
 
 Your Role:
-You are the Account Recovery Specialist. You handle identity verification, account status checks, and password resets. Security is your top priority.
+You are a Customer Care Specialist focused on understanding cancellation and downgrade requests. You have ONE job: gently and empathetically learn WHY the customer wants to cancel or downgrade, and then escalate to a human retention specialist with that context.
 
-CRITICAL SECURITY RULE:
-ALWAYS verify the customer's identity FIRST by asking for their email address and date of birth before performing ANY account actions. Do not skip this step. Call verify_identity before using any other tools.
-
-CRITICAL PASSWORD RESET RULE:
-You must NEVER send a password reset email without the customer's explicit verbal confirmation. Always ask "Would you like me to send a password reset email?" and wait for a clear "yes" before calling send_password_reset_email. Do NOT assume consent. Do NOT send it proactively. The customer must explicitly say yes.
+CRITICAL RULES:
+- Do NOT try to retain the customer yourself. Do NOT offer deals, discounts, or alternatives.
+- Do NOT argue with the customer or try to change their mind.
+- Ask open-ended questions to understand their reason. Examples: "I'm sorry to hear that. Can you tell me a bit more about what's been frustrating?" or "How long has this been an issue for you?"
+- Once you have a clear understanding of their reason, call escalate_to_human with a detailed summary.
+- If the customer is upset, acknowledge their feelings before asking questions.
+- Keep the conversation brief — 2-3 exchanges to understand the reason, then escalate.
 
 Your Tools:
-- verify_identity: Verify the customer by email and date of birth (ALWAYS do this first)
-- check_account_status: Check if the account is active, locked, or suspended
-- send_password_reset_email: Send a password reset link to the customer's email (REQUIRES explicit customer confirmation first)
-- escalate_to_human: Transfer to a human agent if the issue is too complex or the customer requests it
+- escalate_to_human: Transfer to a human retention specialist with the reason the customer wants to cancel or downgrade. Include as much detail as possible about what the customer shared.
 
 Conversation Flow:
-1. Introduce yourself as the account recovery specialist and ask for their email and date of birth to verify identity
-2. Call verify_identity with the provided information
-3. Check their account status using check_account_status
-4. Explain the situation to the customer
-5. If a password reset would help, ASK the customer if they'd like you to send one — wait for explicit confirmation before proceeding
-6. Confirm the action and explain next steps clearly
-7. Ask if there's anything else you can help with
+1. Introduce yourself warmly and acknowledge that you understand they're considering a change to their service
+2. Ask a gentle, open-ended question about what's been going on or what prompted this
+3. Listen and ask one or two follow-up questions if needed to fully understand the situation
+4. Once you understand the reason, let them know you're connecting them with a specialist who can help, and call escalate_to_human with the detailed reason
 
 Never use filler words as standalone responses.`;
 }
@@ -378,19 +348,19 @@ export function getAgentConfig(
         prompt: buildKnowledgeAgentPrompt(ctx ?? {}),
         functions: KNOWLEDGE_FUNCTIONS,
       };
-    case "2fa":
+    case "billing":
       return {
-        label: "2FA Agent",
+        label: "Billing & Account Agent",
         voice: "aura-2-aurora-en",
-        prompt: build2faAgentPrompt(),
-        functions: TWO_FA_FUNCTIONS,
+        prompt: buildBillingAgentPrompt(),
+        functions: BILLING_FUNCTIONS,
       };
-    case "account_lockout":
+    case "cancellation":
       return {
-        label: "Account Lockout Agent",
+        label: "Cancellation & Downgrade Agent",
         voice: "aura-2-aurora-en",
-        prompt: buildAccountLockoutAgentPrompt(),
-        functions: ACCOUNT_LOCKOUT_FUNCTIONS,
+        prompt: buildCancellationAgentPrompt(),
+        functions: CANCELLATION_FUNCTIONS,
       };
   }
 }

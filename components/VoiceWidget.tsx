@@ -15,12 +15,12 @@ import ActivityFeed from "@/components/ActivityFeed";
 import MicButton from "@/components/MicButton";
 import SettingsPanel from "@/components/SettingsPanel";
 import Transcript from "@/components/Transcript";
-import { useVoiceAgent } from "@/lib/use-voice-agent";
+import { useVoiceAgentContext } from "@/lib/voice-agent-context";
 
 type WidgetView = "conversation" | "tools";
 
 export default function VoiceWidget() {
-  const agent = useVoiceAgent();
+  const agent = useVoiceAgentContext();
 
   const [isExpanded, setIsExpanded] = useState(false);
   const [widgetView, setWidgetView] = useState<WidgetView>("conversation");
@@ -148,6 +148,7 @@ export default function VoiceWidget() {
                 <div className="flex items-center gap-2 shrink-0">
                   <MicButton
                     isActive={agent.isActive}
+                    isMuted={agent.isMuted}
                     onClick={agent.handleMicClick}
                     disabled={agent.isConnecting}
                   />

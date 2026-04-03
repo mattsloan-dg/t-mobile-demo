@@ -3,7 +3,7 @@ import { createVoiceSession } from "@/lib/audio";
 import { handleFunctionCall } from "@/lib/functions";
 import { getAgentConfig, type AgentType } from "@/lib/agents";
 import { usePageControl } from "@/lib/page-control";
-import type { ActivityEvent, VASettings, VAServerMessage } from "@/lib/types";
+import type { ActivityEvent, VASettings, VAServerMessage, WSLogEntry } from "@/lib/types";
 import { VoiceAgent } from "@/lib/voice-agent";
 import { createLogger } from "@/lib/logger";
 
@@ -29,15 +29,15 @@ function humanizeSlug(slug: string): string {
 
 /** Map transfer_to param values to AgentType for agent swaps. */
 const TRANSFER_TARGETS: Record<string, AgentType> = {
-  "2fa": "2fa",
-  account_lockout: "account_lockout",
+  billing: "billing",
+  cancellation: "cancellation",
 };
 
-/** Greeting messages per agent after transfer. */
-const TRANSFER_GREETINGS: Record<AgentType, string> = {
-  knowledge: "Hi there, this is Tara. What can I help you find?",
-  "2fa": "Hi there, I'm Tara, the two-factor authentication specialist. I've been briefed on your situation and I'm here to help. First, I'll need to verify your identity. Could you please provide me with your email address and date of birth?",
-  account_lockout: "Hi there, I'm Tara, the account recovery specialist. I've been briefed on your situation and I'm here to help. First, I'll need to verify your identity. Could you please provide me with your email address and date of birth?",
+/** Message returned in the FunctionCallResponse after UpdateThink completes, framed as instructions for the new agent persona. */
+const AGENT_TRANSITION_MESSAGES: Record<AgentType, string> = {
+  knowledge: "You are now the knowledge agent. Help the customer find answers using the help center.",
+  billing: "You are now the billing agent. Your job is to look at the customer's billing account and provide information on recent charges.",
+  cancellation: "You are now the cancellation specialist. Your job is to understand why the customer wants to cancel or downgrade their service, then escalate to a human with the detailed reason.",
 };
 
 
@@ -58,17 +58,18 @@ export function useVoiceAgent() {
   const [articleContext, setArticleContext] = useState("");
   const [articleCatalog, setArticleCatalog] = useState<ArticleSummary[]>([]);
   const [activeAgent, setActiveAgent] = useState<AgentType>("knowledge");
+  const [isMuted, setIsMuted] = useState(false);
+  const [wsLog, setWsLog] = useState<WSLogEntry[]>([]);
 
   const agentRef = useRef<VoiceAgent | null>(null);
   const sessionRef = useRef<ReturnType<typeof createVoiceSession> | null>(null);
-  /** Tracks pending agent transfer — sequential steps: waitThink → waitSpeak → delay → inject. */
+  /** Holds the pending FunctionCallResponse until ThinkUpdated confirms the agent swap. */
   const pendingTransferRef = useRef<{
+    fnId: string;
+    fnName: string;
     targetAgent: AgentType;
-    reason: string;
-    step: "waitThink" | "waitSpeak";
+    timestamp: number;
   } | null>(null);
-  /** Pending inject message for retry if agent is still speaking. */
-  const pendingInjectRef = useRef<{ message: string; retries: number } | null>(null);
 
   useEffect(() => {
     fetch("/api/articles")
@@ -178,6 +179,7 @@ export function useVoiceAgent() {
     setIsConnecting(false);
     setOrbState("idle");
     setActiveAgent("knowledge");
+    setWsLog([]);
   }, []);
 
   const finalizeFunctionEvent = useCallback(
@@ -193,7 +195,7 @@ export function useVoiceAgent() {
     []
   );
 
-  /** Switch to a different agent by sending UpdateThink + UpdateSpeak, then inject greeting once both confirm. */
+  /** Switch to a different agent by sending UpdateThink. */
   const switchAgent = useCallback(
     (targetAgent: AgentType, reason?: string) => {
       const agent = agentRef.current;
@@ -202,17 +204,9 @@ export function useVoiceAgent() {
       const ctx = targetAgent === "knowledge" ? getPromptContext() : undefined;
       const config = getAgentConfig(targetAgent, ctx);
 
-      // Step 1: Send UpdateThink, wait for ThinkUpdated before proceeding
-      pendingTransferRef.current = {
-        targetAgent,
-        reason: reason ?? "Customer needs account-level assistance.",
-        step: "waitThink",
-      };
-
       logger.info("Sending UpdateThink for agent transfer", {
         targetAgent,
         label: config.label,
-        prompt: config.prompt.slice(0, 200) + "...",
         functionCount: config.functions.length,
         functionNames: config.functions.map((f) => f.name),
       });
@@ -276,40 +270,34 @@ export function useVoiceAgent() {
               });
             break;
 
-          case "ThinkUpdated":
-          case "SpeakUpdated": {
+          case "ThinkUpdated": {
             logger.info("Agent config updated", { event: msg.type });
             setIsActive(true);
             setIsConnecting(false);
             setOrbState("listening");
 
-            // Sequential transfer: ThinkUpdated → send UpdateSpeak → SpeakUpdated → inject greeting
+            // If a transfer is pending, now send the FunctionCallResponse with the transition message
             const pending = pendingTransferRef.current;
             if (pending) {
-              if (msg.type === "ThinkUpdated" && pending.step === "waitThink") {
-                // Step 2: Think confirmed, now send UpdateSpeak
-                pending.step = "waitSpeak";
-                const transferConfig = getAgentConfig(pending.targetAgent);
-                logger.info("ThinkUpdated received, sending UpdateSpeak", {
-                  targetAgent: pending.targetAgent,
-                  voice: transferConfig.voice,
-                });
-                agent.sendUpdateSpeak(transferConfig.voice);
-                setCurrentVoice(transferConfig.voice);
-              } else if (msg.type === "SpeakUpdated" && pending.step === "waitSpeak") {
-                // Step 3: Speak confirmed, delay 1s for old agent speech to clear, then inject
-                const target = pending.targetAgent;
-                pendingTransferRef.current = null;
-                const injectMessage = TRANSFER_GREETINGS[target] ?? `Hi there, I'm Tara. How can I help you?`;
-                pendingInjectRef.current = { message: injectMessage, retries: 0 };
-                logger.info("SpeakUpdated received, delaying before inject", { targetAgent: target });
-                setTimeout(() => {
-                  agent.sendInjectAgentMessage(injectMessage);
-                }, 3000);
-              }
+              const message = AGENT_TRANSITION_MESSAGES[pending.targetAgent];
+              const result = JSON.stringify({ message });
+              logger.info("ThinkUpdated received, sending deferred FunctionCallResponse", {
+                targetAgent: pending.targetAgent,
+                message,
+              });
+              agent.sendFunctionCallResponse(pending.fnId, pending.fnName, result);
+              finalizeFunctionEvent(pending.timestamp, result);
+              pendingTransferRef.current = null;
             }
             break;
           }
+
+          case "SpeakUpdated":
+            logger.info("Agent config updated", { event: msg.type });
+            setIsActive(true);
+            setIsConnecting(false);
+            setOrbState("listening");
+            break;
 
           case "ConversationText":
             logger.info("Conversation text", { role: msg.role, content: msg.content });
@@ -337,8 +325,6 @@ export function useVoiceAgent() {
               ttt_latency: msg.ttt_latency,
             });
             setOrbState("speaking");
-            // Inject succeeded, clear pending
-            pendingInjectRef.current = null;
             break;
 
           case "AgentAudioDone":
@@ -383,23 +369,71 @@ export function useVoiceAgent() {
               }
 
 
-              // Handle all functions (including transfers) through the dispatcher
+              // Agent transfers: send UpdateThink first, defer FunctionCallResponse until ThinkUpdated
+              if (fn.name === "escalate_call") {
+                const escalateTo = typeof args.escalate_to === "string" ? args.escalate_to : "";
+                const targetAgent = TRANSFER_TARGETS[escalateTo];
+                if (targetAgent) {
+                  const transferReason = typeof args.reason === "string" ? args.reason : undefined;
+                  pendingTransferRef.current = { fnId: fn.id, fnName: fn.name, targetAgent, timestamp };
+                  switchAgent(targetAgent, transferReason);
+                } else {
+                  // Human escalation — respond immediately
+                  handleFunctionCall(fn.name, fn.arguments).then(({ result }) => {
+                    agent.sendFunctionCallResponse(fn.id, fn.name, result);
+                    finalizeFunctionEvent(timestamp, result);
+                  });
+                }
+                continue;
+              }
+
+              // Handle all other functions through the dispatcher
               handleFunctionCall(fn.name, fn.arguments).then(({ result }) => {
                 agent.sendFunctionCallResponse(fn.id, fn.name, result);
                 finalizeFunctionEvent(timestamp, result);
 
-                // If this was a transfer function, resolve the target and swap agents
-                if (fn.name === "transfer_to_agent") {
-                  const transferTo = typeof args.transfer_to === "string" ? args.transfer_to : "";
-                  if (transferTo === "human") {
-                    // Human escalation is handled by the function result itself
-                  } else {
-                    const targetAgent = TRANSFER_TARGETS[transferTo];
-                    if (targetAgent) {
-                      const transferReason = typeof args.reason === "string" ? args.reason : undefined;
-                      switchAgent(targetAgent, transferReason);
-                    }
-                  }
+                // Inject fake external-service log entries for mock API calls
+                if (fn.name === "verify_identity") {
+                  const parsed = JSON.parse(result) as Record<string, unknown>;
+                  setWsLog((prev) => [
+                    ...prev,
+                    {
+                      direction: "external" as const,
+                      messageType: "IdentityVerification",
+                      payload: {
+                        service: "T-Mobile Identity Service",
+                        endpoint: "POST /v1/identity/verify",
+                        status: parsed.verified ? 200 : 401,
+                        verified: parsed.verified,
+                        user_id: parsed.user_id,
+                        email_masked: parsed.email_masked,
+                        response_time_ms: 800,
+                      },
+                      timestamp: Date.now(),
+                    },
+                  ]);
+                }
+
+                if (fn.name === "lookup_billing") {
+                  const parsed = JSON.parse(result) as Record<string, unknown>;
+                  setWsLog((prev) => [
+                    ...prev,
+                    {
+                      direction: "external" as const,
+                      messageType: "RetrieveAccountDetails",
+                      payload: {
+                        service: "T-Mobile Billing Service",
+                        endpoint: "GET /v1/accounts/billing",
+                        status: 200,
+                        user_id: parsed.user_id,
+                        plan: parsed.plan,
+                        account_balance: parsed.account_balance,
+                        next_payment_due: parsed.next_payment_due,
+                        response_time_ms: 600,
+                      },
+                      timestamp: Date.now(),
+                    },
+                  ]);
                 }
 
                 if (fn.name === "search_help_articles") {
@@ -436,21 +470,6 @@ export function useVoiceAgent() {
 
           case "Warning":
             logger.warn("Voice Agent server warning", { payload: msg });
-
-            // Retry inject if agent was still speaking
-            if (msg.code === "INJECT_AGENT_MESSAGE_DURING_AGENT_SPEECH") {
-              const pending = pendingInjectRef.current;
-              if (pending && pending.retries < 3) {
-                pending.retries++;
-                logger.info("Retrying InjectAgentMessage", { retry: pending.retries });
-                setTimeout(() => {
-                  agent.sendInjectAgentMessage(pending.message);
-                }, 1000);
-              } else {
-                logger.warn("InjectAgentMessage retries exhausted");
-                pendingInjectRef.current = null;
-              }
-            }
             break;
         }
       });
@@ -461,6 +480,10 @@ export function useVoiceAgent() {
 
       agent.on("activity", (event: ActivityEvent) => {
         setActivityEvents((prev) => [...prev, event]);
+      });
+
+      agent.on("ws_log", (entry: WSLogEntry) => {
+        setWsLog((prev) => [...prev, entry]);
       });
 
       agent.on("close", () => {
@@ -485,12 +508,23 @@ export function useVoiceAgent() {
   }, [buildSettings, finalizeFunctionEvent, pageControl, switchAgent]);
 
   const handleMicClick = useCallback(() => {
-    if (isActive) {
-      stopAgent();
-    } else {
+    // First click: establish connection to Deepgram
+    if (!agentRef.current) {
       startAgent();
+      return;
     }
-  }, [isActive, startAgent, stopAgent]);
+
+    // Subsequent clicks: toggle mute/unmute
+    if (isMuted) {
+      sessionRef.current?.unmuteMic();
+      setIsMuted(false);
+      setOrbState("listening");
+    } else {
+      sessionRef.current?.muteMic();
+      setIsMuted(true);
+      setOrbState("idle");
+    }
+  }, [isMuted, startAgent]);
 
   const handleVoiceChange = useCallback((voice: string) => {
     setCurrentVoice(voice);
@@ -502,9 +536,8 @@ export function useVoiceAgent() {
   const handleLlmChange = useCallback(
     (llm: string) => {
       setCurrentLlm(llm);
-      if (isActive) stopAgent();
     },
-    [isActive, stopAgent]
+    []
   );
 
   useEffect(() => {
@@ -517,9 +550,11 @@ export function useVoiceAgent() {
   return {
     isActive,
     isConnecting,
+    isMuted,
     orbState,
     messages,
     activityEvents,
+    wsLog,
     currentVoice,
     currentLlm,
     currentPageTitle,
