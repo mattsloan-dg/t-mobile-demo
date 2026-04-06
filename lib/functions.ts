@@ -27,7 +27,7 @@ export const FUNCTION_HANDLERS: Record<
     await delay(600);
     return JSON.stringify({
       user_id,
-      plan: "T-Mobile Go5G Plus",
+      plan: "T-Mobile Go 5G Plus",
       monthly_charge: "$90.00",
       next_payment_due: "2026-04-15",
       autopay_enabled: true,
@@ -84,10 +84,15 @@ export const FUNCTION_HANDLERS: Record<
   // Transfer functions return a simple acknowledgment.
   // The actual agent switch is handled client-side via UpdateThink.
   escalate_call: async ({ escalate_to, reason }) => {
-    if (escalate_to === "human") {
-      return JSON.stringify({ escalated: true });
-    }
     return JSON.stringify({ escalated: true });
+  },
+
+  initiate_cancellation: async ({ reason }) => {
+    await delay(300);
+    return JSON.stringify({
+      acknowledged: true,
+      message: "Connecting you with a cancellation specialist.",
+    });
   },
 
 };

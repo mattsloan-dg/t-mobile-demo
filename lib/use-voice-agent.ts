@@ -30,14 +30,14 @@ function humanizeSlug(slug: string): string {
 /** Map transfer_to param values to AgentType for agent swaps. */
 const TRANSFER_TARGETS: Record<string, AgentType> = {
   billing: "billing",
-  cancellation: "cancellation",
+  knowledge: "knowledge",
 };
 
 /** Message returned in the FunctionCallResponse after UpdateThink completes, framed as instructions for the new agent persona. */
 const AGENT_TRANSITION_MESSAGES: Record<AgentType, string> = {
   knowledge: "You are now the knowledge agent. Help the customer find answers using the help center.",
   billing: "You are now the billing agent. Your job is to look at the customer's billing account and provide information on recent charges.",
-  cancellation: "You are now the cancellation specialist. Your job is to understand why the customer wants to cancel or downgrade their service, then escalate to a human with the detailed reason.",
+  cancellation: "You are now the cancellation specialist. The customer is being transferred to a human agent and is on hold. Your job is to gather details about why they want to cancel while they wait, then call record_cancellation_reason with a detailed summary before the human agent picks up.",
 };
 
 
@@ -369,6 +369,32 @@ export function useVoiceAgent() {
               }
 
 
+              // Cancellation transfer: send UpdateThink first, defer FunctionCallResponse until ThinkUpdated
+              if (fn.name === "initiate_cancellation") {
+                pendingTransferRef.current = { fnId: fn.id, fnName: fn.name, targetAgent: "cancellation", timestamp };
+                switchAgent("cancellation");
+
+                setWsLog((prev) => [
+                  ...prev,
+                  {
+                    direction: "external" as const,
+                    messageType: "SIPTransferInitiated",
+                    payload: {
+                      service: "T-Mobile SIP Gateway",
+                      endpoint: "POST /v1/sip/transfer",
+                      status: 202,
+                      transfer_target: "cancellation_specialist",
+                      reason: typeof args.reason === "string" ? args.reason : "Customer requested cancellation",
+                      session_id: fn.id,
+                      response_time_ms: 120,
+                    },
+                    timestamp: Date.now(),
+                  },
+                ]);
+
+                continue;
+              }
+
               // Agent transfers: send UpdateThink first, defer FunctionCallResponse until ThinkUpdated
               if (fn.name === "escalate_call") {
                 const escalateTo = typeof args.escalate_to === "string" ? args.escalate_to : "";
@@ -382,8 +408,57 @@ export function useVoiceAgent() {
                   handleFunctionCall(fn.name, fn.arguments).then(({ result }) => {
                     agent.sendFunctionCallResponse(fn.id, fn.name, result);
                     finalizeFunctionEvent(timestamp, result);
+
+                    setWsLog((prev) => [
+                      ...prev,
+                      {
+                        direction: "external" as const,
+                        messageType: "SIPTransferInitiated",
+                        payload: {
+                          service: "T-Mobile SIP Gateway",
+                          endpoint: "POST /v1/sip/transfer",
+                          status: 202,
+                          transfer_target: "human_agent",
+                          reason: typeof args.reason === "string" ? args.reason : "Customer requested human agent",
+                          source_agent: activeAgent,
+                          session_id: fn.id,
+                          response_time_ms: 95,
+                        },
+                        timestamp: Date.now(),
+                      },
+                    ]);
                   });
                 }
+                continue;
+              }
+
+              // Cancellation agent: record reason and respond with hard-coded acknowledgment
+              if (fn.name === "record_cancellation_reason") {
+                const reason = typeof args.reason === "string" ? args.reason : "";
+                const result = JSON.stringify({
+                  recorded: true,
+                  message: "The reason for cancellation has been recorded and will be passed along to the human agent.",
+                });
+                agent.sendFunctionCallResponse(fn.id, fn.name, result);
+                finalizeFunctionEvent(timestamp, result);
+
+                setWsLog((prev) => [
+                  ...prev,
+                  {
+                    direction: "external" as const,
+                    messageType: "CancellationReasonRecorded",
+                    payload: {
+                      service: "T-Mobile CRM",
+                      endpoint: "POST /v1/cancellations/reason",
+                      status: 201,
+                      reason,
+                      session_id: fn.id,
+                      response_time_ms: 180,
+                    },
+                    timestamp: Date.now(),
+                  },
+                ]);
+
                 continue;
               }
 
@@ -427,8 +502,13 @@ export function useVoiceAgent() {
                         status: 200,
                         user_id: parsed.user_id,
                         plan: parsed.plan,
-                        account_balance: parsed.account_balance,
+                        monthly_charge: parsed.monthly_charge,
                         next_payment_due: parsed.next_payment_due,
+                        autopay_enabled: parsed.autopay_enabled,
+                        account_balance: parsed.account_balance,
+                        last_payment: parsed.last_payment,
+                        data_usage: parsed.data_usage,
+                        additional_charges: parsed.additional_charges,
                         response_time_ms: 600,
                       },
                       timestamp: Date.now(),

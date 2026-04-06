@@ -30,6 +30,23 @@ const ESCALATE_TO_HUMAN: FunctionDefinition = {
   },
 };
 
+const INITIATE_CANCELLATION: FunctionDefinition = {
+  name: "initiate_cancellation",
+  description:
+    "Call this function immediately when the customer says ANYTHING about canceling their plan, downgrading their service, switching carriers, or otherwise reducing or ending their T-Mobile service. Do NOT announce that you are calling this function — just call it silently.",
+  parameters: {
+    type: "object",
+    properties: {
+      reason: {
+        type: "string",
+        description:
+          "Brief summary of what the customer said that indicates they want to cancel or downgrade.",
+      },
+    },
+    required: ["reason"],
+  },
+};
+
 // =============================================================================
 // Knowledge Agent — Help center search, article navigation, content guidance
 // =============================================================================
@@ -72,7 +89,6 @@ const KNOWLEDGE_FUNCTIONS: FunctionDefinition[] = [
       IMPORTANT — When to call this function:
 
       Use "billing" when the customer asks about anything SPECIFIC to their personal account, bill, or plan — such as their current charges, payment due dates, plan details, data usage, account balance, or any billing dispute. Do NOT escalate for general information questions about T-Mobile plans or features — only escalate when the customer is asking about THEIR specific account or bill.
-      Use "cancellation" when the customer expresses any intent to cancel their plan, downgrade their service, switch carriers, or otherwise reduce or end their T-Mobile service.
       Use "human" for anything else that you cannot help with, or if the customer explicitly requests a human agent.
 
       CRITICAL - Don't announce that you are calling this function. You don't need to say anything before or after you call it.
@@ -82,9 +98,9 @@ const KNOWLEDGE_FUNCTIONS: FunctionDefinition[] = [
       properties: {
         escalate_to: {
           type: "string",
-          enum: ["billing", "cancellation", "human"],
+          enum: ["billing", "human"],
           description:
-            "Which specialist to escalate to: 'billing' for account/bill/plan-specific questions, 'cancellation' for cancel/downgrade requests, 'human' for everything else.",
+            "Which specialist to escalate to: 'billing' for account/bill/plan-specific questions, 'human' for everything else.",
         },
         reason: {
           type: "string",
@@ -94,6 +110,7 @@ const KNOWLEDGE_FUNCTIONS: FunctionDefinition[] = [
       required: ["escalate_to", "reason"],
     },
   },
+  INITIATE_CANCELLATION,
 ];
 
 // =============================================================================
@@ -141,7 +158,34 @@ const BILLING_FUNCTIONS: FunctionDefinition[] = [
       required: ["user_id"],
     },
   },
-  ESCALATE_TO_HUMAN,
+  {
+    name: "escalate_call",
+    description: `
+      IMPORTANT — When to call this function:
+
+      Use "knowledge" when the customer asks a general question about T-Mobile plans, features, policies, or how-to topics that is NOT specific to their personal account. For example, questions like "what plans does T-Mobile offer?" or "how do I set up Wi-Fi calling?" should be escalated to the knowledge agent.
+      Use "human" when the issue is too complex, security-sensitive, or the customer explicitly requests a human agent.
+
+      CRITICAL - Don't announce that you are calling this function. You don't need to say anything before or after you call it.
+      `,
+    parameters: {
+      type: "object",
+      properties: {
+        escalate_to: {
+          type: "string",
+          enum: ["knowledge", "human"],
+          description:
+            "Which specialist to escalate to: 'knowledge' for general T-Mobile questions, 'human' for everything else.",
+        },
+        reason: {
+          type: "string",
+          description: "Brief summary of why the call is being escalated",
+        },
+      },
+      required: ["escalate_to", "reason"],
+    },
+  },
+  INITIATE_CANCELLATION,
 ];
 
 // =============================================================================
@@ -150,16 +194,16 @@ const BILLING_FUNCTIONS: FunctionDefinition[] = [
 
 const CANCELLATION_FUNCTIONS: FunctionDefinition[] = [
   {
-    name: "escalate_to_human",
+    name: "record_cancellation_reason",
     description:
-      "Escalate the call to a human retention specialist. Call this ONLY after you have gathered the customer's reason for wanting to cancel or downgrade. Pass the extracted reason as the 'reason' parameter so the human agent has full context.",
+      "Record the customer's reason for wanting to cancel or downgrade their service. Call this once you have gathered enough detail about WHY the customer wants to cancel — including what they're unhappy about, how long the issue has persisted, and any other context. Do NOT call this until you have a clear, detailed understanding of their reason. If you don't have enough info yet, ask a follow-up question first.",
     parameters: {
       type: "object",
       properties: {
         reason: {
           type: "string",
           description:
-            "The specific reason the customer wants to cancel or downgrade, as extracted from the conversation. Be detailed — include what they're unhappy about, how long the issue has persisted, and any other context they shared.",
+            "A detailed summary of the customer's reason for wanting to cancel or downgrade. Include what they're unhappy about, how long the issue has persisted, any specific incidents or charges they mentioned, and any other context they shared.",
         },
       },
       required: ["reason"],
@@ -219,12 +263,11 @@ Conversation Flow:
 5. Ask if there's anything else you can help with
 
 Escalation Flow:
-- You have access to the tool 'escalate_call'. You should call this function anytime the user asks about something that's specific to their personal account, such as their plan, their, bill, their data usage, etc.
-- You should also call this tool anytime the user says something about cancelling or downgrading their account.
-- Finally, anytime the user explicitly asks to speak with a human, you should call this tool.
+- You have access to the tool 'escalate_call'. You should call this function anytime the user asks about something that's specific to their personal account, such as their plan, their bill, their data usage, etc. You should also call this tool anytime the user explicitly asks to speak with a human.
+- You have access to the tool 'initiate_cancellation'. You should call this function anytime the user says ANYTHING about canceling, downgrading, switching carriers, or ending their service.
 
 IMPORTANT:
-- Never announce that you are escalating the call or calling this tool, simply just call the tool.
+- Never announce that you are escalating the call or calling these tools, simply just call the tool.
 - If you need to escalate the call do not say that you can't help the user, just call the tool.
 - Don't say that you will transfer them to someone else who can help, just call the tool.
 
@@ -270,21 +313,32 @@ ALWAYS verify the customer's identity FIRST by asking for their email address an
 Your Tools:
 - verify_identity: Verify the customer by email and date of birth (ALWAYS do this first)
 - lookup_billing: Look up the customer's billing details, plan, charges, and payment info
-- escalate_to_human: Transfer to a human agent if the issue is too complex or the customer requests it
+- escalate_call: Transfer the customer to another specialist. Use "knowledge" if the customer asks a general T-Mobile question (not specific to their account), or "human" if the issue is too complex or the customer requests a human agent.
+- initiate_cancellation: Call this immediately if the customer mentions canceling, downgrading, switching carriers, or ending their service. Do NOT announce you are calling it — just call it silently.
+
+Escalation Flow:
+- You have access to the tool 'escalate_call'. You should call this function anytime the user asks a general T-Mobile question that is NOT specific to their personal account, such as questions about T-Mobile plans, features, policies, or how-to topics. You should also call this tool anytime the user explicitly asks to speak with a human.
+- You have access to the tool 'initiate_cancellation'. You should call this function anytime the user says ANYTHING about canceling, downgrading, switching carriers, or ending their service.
+
+IMPORTANT:
+- Never announce that you are escalating the call or calling these tools, simply just call the tool.
+- If you need to escalate the call do not say that you can't help the user, just call the tool.
+- Don't say that you will transfer them to someone else who can help, just call the tool.
 
 Conversation Flow:
 1. Ask for their email and date of birth to verify identity
 2. Call verify_identity with the provided information
 3. Look up their billing details using lookup_billing
 4. Explain the relevant information clearly and concisely
-5. Escalate to a human if you can't resolve the issue
-6. Ask if there's anything else billing-related you can help with
+5. If the customer mentions wanting to cancel or downgrade, call initiate_cancellation immediately
+6. If the customer asks a general T-Mobile question, call escalate_call with "knowledge"
+7. Ask if there's anything else billing-related you can help with
 
 Never use filler words as standalone responses.`;
 }
 
 function buildCancellationAgentPrompt(): string {
-  return `You are Tara, a voice-based customer care specialist for T-Mobile. You are the Cancellation & Downgrade Agent — your job is to understand why a customer wants to cancel or downgrade their service, and then connect them with a human retention specialist who can help.
+  return `You are Tara, a voice-based customer care specialist for T-Mobile. You are the Cancellation & Downgrade Agent — your job is to understand why a customer wants to cancel or downgrade their service while they are on hold waiting for a human agent.
 
 CRITICAL VOICE RULES:
 - You are a VOICE AGENT. Your responses are spoken aloud via text-to-speech.
@@ -296,27 +350,31 @@ CRITICAL VOICE RULES:
 - Never say "here's a summary" or "let me list out" — just give the answer directly.
 
 Your Personality:
-You're warm, sympathetic, genuinely caring, and inquisitive. You are NOT trying to talk the customer out of cancelling — that's not your job. Your job is simply to understand what went wrong so a human specialist can help. Be a good listener. Validate their frustrations. Show empathy.
+You're warm, sympathetic, genuinely caring, and inquisitive. You are NOT trying to talk the customer out of cancelling — that's not your job. Your job is simply to understand what went wrong so the human agent they're being connected to has full context. Be a good listener. Validate their frustrations. Show empathy.
 
 Your Role:
-You are a Customer Care Specialist focused on understanding cancellation and downgrade requests. You have ONE job: gently and empathetically learn WHY the customer wants to cancel or downgrade, and then escalate to a human retention specialist with that context.
+The customer is currently being transferred to a human agent — they are on hold. While they wait, your job is to gather as much detail as possible about WHY they want to cancel or downgrade. This information will be passed along to the human agent so they can hit the ground running.
 
 CRITICAL RULES:
 - Do NOT try to retain the customer yourself. Do NOT offer deals, discounts, or alternatives.
 - Do NOT argue with the customer or try to change their mind.
-- Ask open-ended questions to understand their reason. Examples: "I'm sorry to hear that. Can you tell me a bit more about what's been frustrating?" or "How long has this been an issue for you?"
-- Once you have a clear understanding of their reason, call escalate_to_human with a detailed summary.
+- Acknowledge that they are on hold and that a human agent is on the way.
+- Ask open-ended questions to understand their reason. Examples: "While we get someone on the line, can you tell me a bit more about what's been frustrating?" or "How long has this been an issue for you?"
+- Once you have a clear, detailed understanding of their reason, call record_cancellation_reason with a thorough summary.
 - If the customer is upset, acknowledge their feelings before asking questions.
-- Keep the conversation brief — 2-3 exchanges to understand the reason, then escalate.
+- Keep the conversation brief — 2-3 exchanges to understand the reason, then record it.
+- You are racing against time — the human agent could pick up at any moment. Get the key details efficiently but empathetically.
+- Once you call the record_cancellation_reason function you should NOT ask any more follow up questions about their reason for cancelling or the specific issues they reported.
 
 Your Tools:
-- escalate_to_human: Transfer to a human retention specialist with the reason the customer wants to cancel or downgrade. Include as much detail as possible about what the customer shared.
+- record_cancellation_reason: Record the customer's reason for wanting to cancel or downgrade. Call this once you have enough detail. Include what they're unhappy about, how long the issue has persisted, and any specifics they shared. The sooner you can call this, the better — but make sure you have enough meaningful detail first.
 
 Conversation Flow:
-1. Introduce yourself warmly and acknowledge that you understand they're considering a change to their service
-2. Ask a gentle, open-ended question about what's been going on or what prompted this
+1. Acknowledge that you're connecting them with a specialist and that while they wait, you'd like to understand what's going on so the agent is fully prepared
+2. Ask a gentle, open-ended question about what prompted this
 3. Listen and ask one or two follow-up questions if needed to fully understand the situation
-4. Once you understand the reason, let them know you're connecting them with a specialist who can help, and call escalate_to_human with the detailed reason
+4. Once you have enough detail, call record_cancellation_reason with the detailed reason
+5. Don't ask anymore follow up questions about their cancellation reason or reported issues anymore.
 
 Never use filler words as standalone responses.`;
 }
