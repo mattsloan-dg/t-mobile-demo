@@ -31,7 +31,7 @@ The entire voice pipeline runs client-side — the browser connects directly to 
 
 ## Multi-Agent System
 
-Tara uses a multi-agent architecture where specialized agents handle different domains. Transfers happen mid-conversation via Deepgram's `UpdateThink` / `UpdateSpeak` messages — the WebSocket stays open and the customer experiences a seamless handoff.
+Tara uses a multi-agent architecture where specialized agents handle different domains. Transfers happen mid-conversation via Deepgram's `UpdateThink` messages — the WebSocket stays open and the customer experiences a seamless handoff.
 
 ### Knowledge Agent (entry point)
 
@@ -41,49 +41,49 @@ The default agent. Helps customers find answers by searching and navigating T-Mo
 
 - `search_help_articles` — keyword search across 80 help articles (RAG)
 - `navigate_to_article` — push the browser to a specific article page
-- `transfer_to_agent` — hand off to a specialist or human
+- `escalate_call` — hand off to a specialist or human
+- `initiate_cancellation` — transfer to Cancellation Agent
 
-**Transfer routing** is determined by a `transfer_to` parameter:
+**Transfer routing** is determined by the `escalate_call` target parameter:
 | Value | Target |
 |-------|--------|
-| `2fa` | 2FA Agent |
-| `account_lockout` | Account Lockout Agent |
+| `billing` | Billing & Account Agent |
 | `human` | Human escalation (simulated) |
 
-### 2FA Agent
+Cancellation/downgrade intent triggers `initiate_cancellation` directly.
 
-Handles two-factor authentication inquiries — what method is configured, backup codes, authenticator app issues.
+### Billing & Account Agent
 
-**Tools:**
-
-- `verify_identity` — verify customer by email + date of birth (required first)
-- `check_2fa_method` — check configured 2FA method
-- `escalate_to_human` — hand off to a human
-
-### Account Lockout Agent
-
-Handles locked/suspended accounts and password resets.
+Handles identity-verified account lookups and billing inquiries — plan details, charges, payments, data usage, and autopay status.
 
 **Tools:**
 
 - `verify_identity` — verify customer by email + date of birth (required first)
-- `check_account_status` — check if account is active, locked, or suspended
-- `send_password_reset_email` — send a password reset link (**requires explicit customer confirmation**)
-- `escalate_to_human` — hand off to a human
+- `lookup_billing` — retrieve plan, charges, payment status, data usage, and additional charges
+- `escalate_call` — hand off to Knowledge Agent (general questions) or human (complex/sensitive issues)
+- `initiate_cancellation` — transfer to Cancellation Agent
 
-> **Guardrail:** The Account Lockout Agent will always ask the customer for explicit verbal confirmation before sending a password reset email. It will never send one proactively.
+> **Guardrail:** The Billing Agent always verifies customer identity before performing any account lookups. It does not attempt to upsell or retain customers.
+
+### Cancellation & Downgrade Agent
+
+Gathers detailed reasons for cancellation while the customer waits for a human agent. Activated when either the Knowledge or Billing agent detects cancellation intent.
+
+**Tools:**
+
+- `record_cancellation_reason` — record the customer's detailed cancellation reason and context
+
+> **Guardrail:** The Cancellation Agent listens empathetically and gathers context but does not argue, offer deals, or attempt to retain. Once the reason is recorded, it does not ask further follow-ups.
 
 ### Agent Transfer Flow
 
 ```
-1. Knowledge Agent calls transfer_to_agent({ transfer_to: "2fa", reason: "..." })
-2. Client sends FunctionCallResponse back to Deepgram
-3. Client sends UpdateThink with 2FA Agent's prompt + functions
+1. Agent calls escalate_call({ target: "billing" }) or initiate_cancellation()
+2. Client defers FunctionCallResponse until agent swap completes
+3. Client sends UpdateThink with the new agent's prompt + functions
 4. Deepgram confirms with ThinkUpdated
-5. Client sends UpdateSpeak with 2FA Agent's voice
-6. Deepgram confirms with SpeakUpdated
-7. Client injects the 2FA Agent's greeting via InjectAgentMessage
-8. 2FA Agent begins speaking with the customer
+5. Client sends deferred FunctionCallResponse with transition message
+6. New agent begins speaking with the customer
 ```
 
 ## Project Structure
